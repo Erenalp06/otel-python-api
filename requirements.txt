@@ -1,0 +1,11 @@
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation
+opentelemetry-instrumentation-flask
+opentelemetry-instrumentation-requests
+opentelemetry-instrumentation-sqlalchemy
+opentelemetry-exporter-otlp
+uvicorn
+flask
+requests
+psycopg2-binary
