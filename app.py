@@ -3,34 +3,26 @@ from flask_sqlalchemy import SQLAlchemy
 import requests
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
-
+import os
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:postgres@localhost/telemetry'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("SQLALCHEMY_DATABASE_URI")
 app.config['SQLALCHEMY_BINDS'] = {
-    'sqlite': 'sqlite:///telemetry.db',
-    'postgres': 'postgresql://postgres:postgres@localhost/telemetry'
+   'postgres': os.getenv("SQLALCHEMY_DATABASE_URI")
 }
-#app.config["SQLALCHEMY_ECHO"] = True
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = os.getenv("SQLALCHEMY_TRACK_MODIFICATIONS")
 db = SQLAlchemy(app)
 
-pg_engine = create_engine('postgresql://postgres:postgres@localhost/telemetry')
+pg_engine = create_engine(os.getenv("SQLALCHEMY_DATABASE_URI"))
 
 # Create User Model for Postgre
 class User(db.Model):
     __bind_key__ = 'postgres'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50))
-
-class SQLiteUser(db.Model):
-    __bind_key__ = 'sqlite'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50))
-
-sqlite_engine = create_engine(app.config['SQLALCHEMY_BINDS']['sqlite']) 
-
 
 #API Routes
 @app.route("/", methods=["GET"])
@@ -45,21 +37,15 @@ def get_users():
 @app.route("/", methods=["POST"])
 def add_user():
     try:
-        name = request.json['name']
-
+        name = request.json['name']       
         
-        sqlite_session = scoped_session(sessionmaker(bind=sqlite_engine))
-        sqlite_user = SQLiteUser(name=name)        
-        sqlite_session.add(sqlite_user)
-        sqlite_session.commit()  
-
         pg_session = scoped_session(sessionmaker(bind=pg_engine))
 
         pg_user = User(name=name)
         pg_session.add(pg_user)
         pg_session.commit()       
 
-        return jsonify({"postgresql_id": pg_user.id, "sqlite_id":sqlite_user.id}), 200
+        return jsonify({"postgresql_id": pg_user.id}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -78,9 +64,7 @@ def fetch_data():
     
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()    
-        engine = create_engine(app.config['SQLALCHEMY_BINDS']['sqlite'])
-        SQLiteUser.metadata.create_all(engine)        
+        db.create_all()                
     app.run(host="0.0.0.0", port=5005, debug=False)
 
     
