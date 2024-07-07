@@ -10,4 +10,4 @@ COPY . /app
 
 EXPOSE 5005
 
-CMD ["opentelemetry-instrument", "--traces_exporter", "console,otlp", "--metrics_exporter", "console", "--service_name", "python-telemetry-api", "--exporter_otlp_endpoint", "http://10.150.238.177:4317", "python3", "app.py"]
+CMD ["opentelemetry-instrument", "--traces_exporter", "console,otlp", "--metrics_exporter", "console", "--service_name", "python-telemetry-api", "--exporter_otlp_endpoint", "http://192.168.1.11:4317", "python3", "app.py"]

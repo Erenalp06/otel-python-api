@@ -5,6 +5,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 import os
 import logging
+from opentelemetry.trace import Span
+from opentelemetry import trace
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
 logging.basicConfig(level=logging.DEBUG)
 
 
@@ -39,6 +42,11 @@ def add_user():
     try:
         name = request.json['name']       
         
+        span = trace.get_current_span()
+        if span and isinstance(span, Span):
+            span.set_attribute("http.request.body", request.data.decode("utf-8"))
+
+
         pg_session = scoped_session(sessionmaker(bind=pg_engine))
 
         pg_user = User(name=name)
