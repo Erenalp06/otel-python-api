@@ -1,78 +1,112 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-import requests
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 import os
 import logging
+
+#OpenTelemetry importları
 from opentelemetry.trace import Span
 from opentelemetry import trace
-from opentelemetry.instrumentation.flask import FlaskInstrumentor
+
 logging.basicConfig(level=logging.DEBUG)
 
-
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("SQLALCHEMY_DATABASE_URI")
-app.config['SQLALCHEMY_BINDS'] = {
-   'postgres': os.getenv("SQLALCHEMY_DATABASE_URI")
-}
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = os.getenv("SQLALCHEMY_TRACK_MODIFICATIONS")
+
+#before_request Hook - İstek gövdesini (body) OpenTelemetry span'e ekle
+@app.before_request
+def add_request_body_to_trace():
+    span = trace.get_current_span()
+    if span and isinstance(span, Span):
+        span.set_attribute("http.request.body", request.get_data(as_text=True))
+
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:///test.db")
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+pg_engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=pg_engine)
 
-pg_engine = create_engine(os.getenv("SQLALCHEMY_DATABASE_URI"))
-
-# Create User Model for Postgre
+#Model (User)
 class User(db.Model):
-    __bind_key__ = 'postgres'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50))
+    is_admin = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
 
-#API Routes
-@app.route("/", methods=["GET"])
-def get_users():
-    try:
-        users = User.query.all()
-        return jsonify({"users:": [{"id": user.id, "name": user.name} for user in users]}), 200       
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500   
-
-    
-@app.route("/", methods=["POST"])
+#POST /users/add
+@app.route("/users/add", methods=["POST"])
 def add_user():
     try:
-        name = request.json['name']       
+        data = request.json
+        name = data.get("name")
+        if not name:
+            return jsonify({"error": "Name is required"}), 400
         
-        span = trace.get_current_span()
-        if span and isinstance(span, Span):
-            span.set_attribute("http.request.body", request.data.decode("utf-8"))
+        session = scoped_session(SessionLocal)
+        new_user = User(name=name)
+        session.add(new_user)
+        session.commit()
+        user_id = new_user.id
+        session.close()
 
-
-        pg_session = scoped_session(sessionmaker(bind=pg_engine))
-
-        pg_user = User(name=name)
-        pg_session.add(pg_user)
-        pg_session.commit()       
-
-        return jsonify({"postgresql_id": pg_user.id}), 200
+        return jsonify({
+            "message": "User added successfully",
+            "user_id": user_id
+        }), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/fetch-data")
-def fetch_data():
+#POST /users/make_admin
+@app.route("/users/make_admin", methods=["POST"])
+def make_admin():
     try:
-        url =  "https://api.thecatapi.com/v1/images/search"
-        response = requests.get(url)
-        response.raise_for_status()    
-        data = response.json()
+        data = request.json
+        user_id = data.get("user_id")
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
 
-        return jsonify(data), 200
+        session = scoped_session(SessionLocal)
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            session.close()
+            return jsonify({"error": "User not found"}), 404
+        
+        user.is_admin = True
+        session.commit()
+        session.close()
+
+        return jsonify({
+            "message": f"User {user_id} is now admin"
+        }), 200
     except Exception as e:
-        status_code = response.status_code if hasattr(response, 'status_code') else 500
-        return jsonify({"error": "Failed to fetch data " + str(e)}), status_code
-    
+        return jsonify({"error": str(e)}), 500
+
+#POST /users/deactivate
+@app.route("/users/deactivate", methods=["POST"])
+def deactivate_user():
+    try:
+        data = request.json
+        user_id = data.get("user_id")
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+
+        session = scoped_session(SessionLocal)
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            session.close()
+            return jsonify({"error": "User not found"}), 404
+
+        user.is_active = False
+        session.commit()
+        session.close()
+
+        return jsonify({
+            "message": f"User {user_id} has been deactivated"
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()                
+        db.create_all()
     app.run(host="0.0.0.0", port=5005, debug=False)
-
-    

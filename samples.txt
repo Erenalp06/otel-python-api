@@ -1,0 +1,13 @@
+curl -X POST -H "Content-Type: application/json" \
+-d '{"name":"Alice"}' \
+http://localhost:5005/users/add
+
+
+curl -X POST -H "Content-Type: application/json" \
+-d '{"user_id":1}' \
+http://localhost:5005/users/make_admin
+
+
+curl -X POST -H "Content-Type: application/json" \
+-d '{"user_id":1}' \
+http://localhost:5005/users/deactivate
