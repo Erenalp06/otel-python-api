@@ -39,6 +39,25 @@ Aşağıdaki komut ile Jaeger Collector'ünü başlatın.
   jaegertracing/all-in-one:latest
 ```
 
+ElasticSearch Bağımlılığı Olmadan Jaeger Colloctor'u Çalıştırmak İçin
+```bash
+docker run -d --name jaeger \
+  -e COLLECTOR_ZIPKIN_HTTP_PORT=9411 \
+  -e COLLECTOR_OTLP_ENABLED=true \
+  -p 5775:5775/udp \
+  -p 6831:6831/udp \
+  -p 6832:6832/udp \
+  -p 5778:5778 \
+  -p 16686:16686 \
+  -p 14268:14268 \
+  -p 14250:14250 \
+  -p 9411:9411 \
+  -p 4317:4317 \
+  -p 4318:4318 \
+  jaegertracing/all-in-one:latest
+
+```
+
 ## Uygulamayı Çalıştırmak
 
 Uygulamayı Docker Compose ile başlatmak için aşağıdaki adımları izleyin:
