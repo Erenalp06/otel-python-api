@@ -20,6 +20,13 @@ def add_request_body_to_trace():
     if span and isinstance(span, Span):
         span.set_attribute("http.request.body", request.get_data(as_text=True))
 
+@app.after_request
+def after_request(response):
+    span = trace.get_current_span()
+    if span and response.content_type == "application/json":
+        span.set_attribute("http.response.body", response.get_data(as_text=True))
+    return response
+
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:///test.db")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)

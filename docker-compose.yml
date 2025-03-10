@@ -7,9 +7,10 @@ services:
     environment:
       - FLASK_APP=app.py
       - SQLALCHEMY_DATABASE_URI=postgresql://postgres:postgres@db/postgres
-      - SQLALCHEMY_TRACK_MODIFICATIONS=False    
+      - SQLALCHEMY_TRACK_MODIFICATIONS=False
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:latest
